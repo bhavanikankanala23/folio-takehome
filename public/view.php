@@ -1,7 +1,7 @@
 <?php
 
-require __DIR__ . '/../lib/bootstrap.php';
-require __DIR__ . '/../lib/layout.php';
+require_once __DIR__ . '/../lib/bootstrap.php';
+require_once __DIR__ . '/../lib/layout.php';
 
 $token = $_GET['token'] ?? '';
 
@@ -27,11 +27,28 @@ if (!$doc) {
     exit;
 }
 
+if (!empty($doc['publish_at']) && strtotime($doc['publish_at']) > time()) {
+    http_response_code(403);
+    render_header('Not yet available');
+    ?>
+    <div class="centered-message">
+        <h1>Not yet available</h1>
+        <p>This document is scheduled to be published later.</p>
+    </div>
+    <?php
+    render_footer();
+    exit;
+}
+
 render_header($doc['title']);
 ?>
 
 <h1 class="page-title"><?= h($doc['title']) ?></h1>
 <p class="meta">Shared with <?= h($doc['recipient_email']) ?></p>
+
+<?php if (!empty($doc['public_id'])): ?>
+    <p class="meta">Readable ID: <code><?= h($doc['public_id']) ?></code></p>
+<?php endif ?>
 
 <pre class="doc-body"><?= h($doc['body']) ?></pre>
 
