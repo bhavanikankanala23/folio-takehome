@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../lib/bootstrap.php';
 
 system('php ' . escapeshellarg(__DIR__ . '/../seed.php') . ' > /dev/null', $rc);
+
 if ($rc !== 0) {
     fwrite(STDERR, "seed failed\n");
     exit(1);
@@ -15,6 +16,7 @@ $fail = 0;
 
 function test(string $name, callable $fn): void {
     global $pass, $fail;
+
     try {
         $fn();
         echo "  [ok] {$name}\n";
@@ -27,7 +29,9 @@ function test(string $name, callable $fn): void {
 
 function assert_true($cond, string $msg = ''): void {
     if (!$cond) {
-        throw new RuntimeException($msg !== '' ? $msg : 'expected true');
+        throw new RuntimeException(
+            $msg !== '' ? $msg : 'expected true'
+        );
     }
 }
 
@@ -40,20 +44,36 @@ test('seeded share link resolves to the seeded document', function () {
         JOIN documents d ON d.id = s.document_id
         LIMIT 1
     ');
+
     $stmt->execute();
+
     $row = $stmt->fetch();
 
-    assert_true($row !== false, 'expected seeded share to resolve');
-    assert_true($row['title'] === 'Welcome Packet', 'unexpected title: ' . var_export($row['title'], true));
+    assert_true(
+        $row !== false,
+        'expected seeded share to resolve'
+    );
+
+    assert_true(
+        $row['title'] === 'Welcome Packet',
+        'unexpected title: ' . var_export($row['title'], true)
+    );
 });
 
 test('created document gets a human-readable public id', function () {
     $publicId = generate_public_id('Onboarding Packet');
 
     $stmt = db()->prepare('
-        INSERT INTO documents (title, body, created_by, publish_at, public_id)
+        INSERT INTO documents (
+            title,
+            body,
+            created_by,
+            publish_at,
+            public_id
+        )
         VALUES (?, ?, ?, ?, ?)
     ');
+
     $stmt->execute([
         'Onboarding Packet',
         'Welcome to the team.',
@@ -64,23 +84,54 @@ test('created document gets a human-readable public id', function () {
 
     $docId = (int) db()->lastInsertId();
 
-    $stmt = db()->prepare('SELECT public_id FROM documents WHERE id = ?');
+    $stmt = db()->prepare('
+        SELECT public_id
+        FROM documents
+        WHERE id = ?
+    ');
+
     $stmt->execute([$docId]);
+
     $doc = $stmt->fetch();
 
-    assert_true($doc !== false, 'expected document to exist');
-    assert_true($doc['public_id'] !== '', 'expected public_id to be populated');
-    assert_true(str_starts_with($doc['public_id'], 'onboarding-packet-'), 'unexpected public_id: ' . $doc['public_id']);
+    assert_true(
+        $doc !== false,
+        'expected document to exist'
+    );
+
+    assert_true(
+        $doc['public_id'] !== '',
+        'expected public_id to be populated'
+    );
+
+    assert_true(
+        str_starts_with(
+            $doc['public_id'],
+            'onboarding-packet-'
+        ),
+        'unexpected public_id: ' . $doc['public_id']
+    );
 });
 
 test('future scheduled document is not available before publish time', function () {
     $publicId = generate_public_id('Future Document');
-    $publishAt = date('Y-m-d\TH:i', time() + 3600);
+
+    $publishAt = date(
+        'Y-m-d\TH:i',
+        time() + 3600
+    );
 
     $stmt = db()->prepare('
-        INSERT INTO documents (title, body, created_by, publish_at, public_id)
+        INSERT INTO documents (
+            title,
+            body,
+            created_by,
+            publish_at,
+            public_id
+        )
         VALUES (?, ?, ?, ?, ?)
     ');
+
     $stmt->execute([
         'Future Document',
         'This should not be visible yet.',
@@ -91,22 +142,40 @@ test('future scheduled document is not available before publish time', function 
 
     $docId = (int) db()->lastInsertId();
 
-    $stmt = db()->prepare('SELECT * FROM documents WHERE id = ?');
+    $stmt = db()->prepare('
+        SELECT *
+        FROM documents
+        WHERE id = ?
+    ');
+
     $stmt->execute([$docId]);
+
     $doc = $stmt->fetch();
 
-    $isNotYetAvailable = !empty($doc['publish_at']) && strtotime($doc['publish_at']) > time();
+    $isNotYetAvailable =
+        !empty($doc['publish_at']) &&
+        strtotime($doc['publish_at']) > time();
 
-    assert_true($isNotYetAvailable, 'expected future document to be blocked before publish time');
+    assert_true(
+        $isNotYetAvailable,
+        'expected future document to be blocked before publish time'
+    );
 });
 
 test('document title search finds matching documents', function () {
     $publicId = generate_public_id('Benefits Guide');
 
     $stmt = db()->prepare('
-        INSERT INTO documents (title, body, created_by, publish_at, public_id)
+        INSERT INTO documents (
+            title,
+            body,
+            created_by,
+            publish_at,
+            public_id
+        )
         VALUES (?, ?, ?, ?, ?)
     ');
+
     $stmt->execute([
         'Benefits Guide',
         'Health and retirement information.',
@@ -124,21 +193,43 @@ test('document title search finds matching documents', function () {
         WHERE LOWER(d.title) LIKE LOWER(?)
         ORDER BY d.created_at DESC
     ');
-    $stmt->execute(['%' . $search . '%']);
+
+    $stmt->execute([
+        '%' . $search . '%'
+    ]);
+
     $docs = $stmt->fetchAll();
 
-    assert_true(count($docs) >= 1, 'expected at least one matching document');
-    assert_true($docs[0]['title'] === 'Benefits Guide', 'expected Benefits Guide search result');
+    assert_true(
+        count($docs) >= 1,
+        'expected at least one matching document'
+    );
+
+    assert_true(
+        $docs[0]['title'] === 'Benefits Guide',
+        'expected Benefits Guide search result'
+    );
 });
 
 test('document creation and scheduling can be audited', function () {
     $publicId = generate_public_id('Audit Test Document');
-    $publishAt = date('Y-m-d\TH:i', time() + 7200);
+
+    $publishAt = date(
+        'Y-m-d\TH:i',
+        time() + 7200
+    );
 
     $stmt = db()->prepare('
-        INSERT INTO documents (title, body, created_by, publish_at, public_id)
+        INSERT INTO documents (
+            title,
+            body,
+            created_by,
+            publish_at,
+            public_id
+        )
         VALUES (?, ?, ?, ?, ?)
     ');
+
     $stmt->execute([
         'Audit Test Document',
         'Audit body.',
@@ -166,11 +257,93 @@ test('document creation and scheduling can be audited', function () {
         AND entity_id = ?
         AND action IN (?, ?)
     ');
-    $stmt->execute(['document', $docId, 'create', 'schedule']);
+
+    $stmt->execute([
+        'document',
+        $docId,
+        'create',
+        'schedule',
+    ]);
+
     $row = $stmt->fetch();
 
-    assert_true((int) $row['count'] === 2, 'expected create and schedule audit logs');
+    assert_true(
+        (int) $row['count'] === 2,
+        'expected create and schedule audit logs'
+    );
+});
+
+test('share creation is audited', function () {
+    $publicId = generate_public_id('Share Audit Document');
+
+    $stmt = db()->prepare('
+        INSERT INTO documents (
+            title,
+            body,
+            created_by,
+            publish_at,
+            public_id
+        )
+        VALUES (?, ?, ?, ?, ?)
+    ');
+
+    $stmt->execute([
+        'Share Audit Document',
+        'Share audit body.',
+        1,
+        null,
+        $publicId,
+    ]);
+
+    $docId = (int) db()->lastInsertId();
+
+    $token = random_token();
+
+    $stmt = db()->prepare('
+        INSERT INTO shares (
+            document_id,
+            token,
+            recipient_email
+        )
+        VALUES (?, ?, ?)
+    ');
+
+    $stmt->execute([
+        $docId,
+        $token,
+        'recipient@example.com',
+    ]);
+
+    $shareId = (int) db()->lastInsertId();
+
+    audit_log('create', 'share', $shareId, [
+        'document_id' => $docId,
+        'public_id' => $publicId,
+        'recipient_email' => 'recipient@example.com',
+    ]);
+
+    $stmt = db()->prepare('
+        SELECT COUNT(*) AS count
+        FROM audit_log
+        WHERE entity_type = ?
+        AND entity_id = ?
+        AND action = ?
+    ');
+
+    $stmt->execute([
+        'share',
+        $shareId,
+        'create',
+    ]);
+
+    $row = $stmt->fetch();
+
+    assert_true(
+        (int) $row['count'] === 1,
+        'expected share creation audit log'
+    );
 });
 
 echo "\n{$pass} passed, {$fail} failed.\n";
+
 exit($fail > 0 ? 1 : 0);
